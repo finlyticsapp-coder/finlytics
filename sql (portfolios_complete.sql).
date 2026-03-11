@@ -1,0 +1,36 @@
+-- ========================================
+-- Complete Portfolios Table SQL (Supabase)
+-- ========================================
+
+-- 1️⃣ Criação da tabela portfolios
+CREATE TABLE public.portfolios (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
+  name text,
+  owner_id uuid,
+  assets jsonb DEFAULT '{}'::jsonb,
+  performance numeric DEFAULT 0,
+  benchmark numeric DEFAULT 0,
+  risk_score numeric DEFAULT 0,
+  last_updated timestamp with time zone DEFAULT now(),
+  CONSTRAINT portfolios_pkey PRIMARY KEY (id)
+);
+
+-- 2️⃣ Habilitar Row-Level Security
+ALTER TABLE public.portfolios ENABLE ROW LEVEL SECURITY;
+
+-- 3️⃣ Políticas RLS
+
+-- Permitir que todos os usuários autenticados acessem a tabela
+CREATE POLICY "allow authenticated users"
+ON public.portfolios
+FOR ALL
+USING (auth.uid() IS NOT NULL)
+WITH CHECK (auth.uid() IS NOT NULL);
+
+-- Permitir que cada usuário gerencie seus próprios portfólios
+CREATE POLICY "Users can manage their own portfolios"
+ON public.portfolios
+FOR ALL
+USING (auth.uid() = owner_id)
+WITH CHECK (auth.uid() = owner_id);
