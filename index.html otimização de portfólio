@@ -1,0 +1,75 @@
+<!-- Botão para otimização do portfólio -->
+<button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
+
+<!-- Canvas para a fronteira eficiente -->
+<canvas id="fronteira" width="400" height="400"></canvas>
+
+<script>
+// Passo 4: Melhor portfólio pelo Sharpe Ratio
+function otimizarPortfolio() {
+  const rf = 0.02; // taxa livre de risco
+  const passos = 50;
+  let melhorSharpe = -Infinity;
+  let melhorPort = {};
+
+  const pontos = [];
+
+  for (let w1 = 0; w1 <= 1; w1 += 1/passos) {
+    for (let w2 = 0; w2 <= 1-w1; w2 += 1/passos) {
+      for (let w3 = 0; w3 <= 1-w1-w2; w3 += 1/passos) {
+        let w4 = 1 - w1 - w2 - w3;
+        if (w4 < 0) continue;
+
+        let r = w1*retornos[0] + w2*retornos[1] + w3*retornos[2] + w4*retornos[3];
+        let s = Math.sqrt(Math.pow(w1*riscos[0],2) +
+                          Math.pow(w2*riscos[1],2) +
+                          Math.pow(w3*riscos[2],2) +
+                          Math.pow(w4*riscos[3],2));
+        let sharpe = (r - rf)/s;
+
+        pontos.push({x: s*100, y: r*100});
+
+        if (sharpe > melhorSharpe) {
+          melhorSharpe = sharpe;
+          melhorPort = {x: s*100, y: r*100, w:[w1,w2,w3,w4], sharpe};
+        }
+      }
+    }
+  }
+
+  // Desenhar a fronteira eficiente com melhor Sharpe
+  const ctx = document.getElementById('fronteira');
+  new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
+        {
+          label: 'Fronteira eficiente',
+          data: pontos,
+          pointRadius: 2,
+          backgroundColor: '#36A2EB'
+        },
+        {
+          label: 'Melhor Sharpe',
+          data: [{x: melhorPort.x, y: melhorPort.y}],
+          pointRadius: 6,
+          backgroundColor: '#FF0000'
+        }
+      ]
+    },
+    options: {
+      scales: {
+        x: { title: { display:true, text:'Risco (%)' } },
+        y: { title: { display:true, text:'Retorno (%)' } }
+      }
+    }
+  });
+
+  document.getElementById("resultado").innerHTML +=
+    `<br><br>Melhor portfólio (Sharpe Ratio: ${melhorSharpe.toFixed(2)}):
+     <br>BTC: ${(melhorPort.w[0]*100).toFixed(1)}%
+     <br>AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%
+     <br>NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%
+     <br>SPY: ${(melhorPort.w[3]*100).toFixed(1)}%`;
+}
+    </script>
