@@ -61,10 +61,15 @@ background:#1d4ed8;
 margin-top:30px;
 text-align:center;
 font-size:18px;
+line-height:1.6;
 }
 
 .chart{
 margin-top:40px;
+}
+
+canvas{
+max-width:100%;
 }
 
 </style>
@@ -125,6 +130,7 @@ function simular(){
 let simulacoes=1000
 let valorInicial=10000
 let resultados=[]
+let evolucao=[]
 
 for(let i=0;i<simulacoes;i++){
 
@@ -143,13 +149,15 @@ resultados.push(valor)
 
 let media=resultados.reduce((a,b)=>a+b,0)/simulacoes
 
-document.getElementById("resultado").innerHTML+=
+document.getElementById("resultado").innerHTML=
 
-"<br><br>Valor médio após 10 anos: $"+media.toFixed(2)
+"Valor médio após 10 anos: $"+media.toFixed(2)
+
+criarGraficoMonteCarlo()
 
 }
 
-function criarGrafico(){
+function criarGraficoPortfolio(){
 
 const ctx=document.getElementById("grafico")
 
@@ -180,7 +188,47 @@ legend:{position:"bottom"}
 
 }
 
-criarGrafico()
+function criarGraficoMonteCarlo(){
+
+const ctx=document.getElementById("grafico")
+
+if(chart){
+chart.destroy()
+}
+
+let anos=[]
+let valores=[]
+let valor=10000
+
+for(let i=0;i<=10;i++){
+
+anos.push("Ano "+i)
+valores.push(valor)
+
+let r=(Math.random()*0.20)-0.05
+valor=valor*(1+r)
+
+}
+
+chart=new Chart(ctx,{
+type:"line",
+data:{
+labels:anos,
+datasets:[{
+label:"Simulação de crescimento",
+data:valores
+}]
+},
+options:{
+plugins:{
+legend:{display:true}
+}
+}
+})
+
+}
+
+criarGraficoPortfolio()
 
 </script>
 
