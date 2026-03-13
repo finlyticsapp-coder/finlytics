@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finlytics AI - Plataforma de Portfólio</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* ===============================
+       Estilo básico do app
+       =============================== */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f9fc;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #1a1a1a;
+    }
+    #container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    button {
+      display: block;
+      margin: 15px auto;
+      padding: 10px 20px;
+      background: #0070f3;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #005fcc;
+    }
+    #resultado {
+      text-align: center;
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 18px;
+    }
+    canvas {
+      display: block;
+      margin: 20px auto;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <!-- ===============================
+       Estrutura principal
+       =============================== -->
+  <div id="container">
+    <h1>Finlytics AI</h1>
+    <h2>Plataforma de análise de portfólio</h2>
+
+    <button onclick="calcular()">Calcular Retorno & Risco</button>
+    <button onclick="simulacaoMonteCarlo()">Simular 10 anos</button>
+
+    <div id="resultado"></div>
+    <canvas id="grafico"></canvas>
+  </div>
+
+  <!-- ===============================
+       Lógica JavaScript
+       =============================== -->
+  <script>
+    /* MIT License
+       Victor Freitas - 2026
+       Código aberto para estudo, modificação e uso comercial
+    */
+
+    // Pesos, retornos e riscos dos ativos
+    const pesos = [0.30, 0.25, 0.20, 0.25];
+    const retornos = [0.15, 0.12, 0.18, 0.10];
+    const riscos = [0.40, 0.30, 0.35, 0.20];
+
+    // Função para calcular retorno esperado e risco total
+    function calcular() {
+      let retornoEsperado = 0;
+      let riscoTotal = 0;
+
+      for (let i = 0; i < pesos.length; i++) {
+        retornoEsperado += pesos[i] * retornos[i];
+        riscoTotal += pesos[i] * riscos[i];
+      }
+
+      document.getElementById("resultado").innerHTML =
+        `Retorno esperado: ${(retornoEsperado*100).toFixed(2)}%<br>` +
+        `Risco estimado: ${(riscoTotal*100).toFixed(2)}%`;
+    }
+
+    // Simulação de Monte Carlo
+    function simulacaoMonteCarlo() {
+      let simulacoes = 1000;
+      let valorInicial = 10000;
+      let resultados = [];
+
+      for (let i = 0; i < simulacoes; i++) {
+        let valor = valorInicial;
+
+        for (let ano = 0; ano < 10; ano++) {
+          let retornoAleatorio = (Math.random() * 0.20) - 0.05;
+          valor = valor * (1 + retornoAleatorio);
+        }
+
+        resultados.push(valor);
+      }
+
+      let media = resultados.reduce((a,b)=>a+b,0)/simulacoes;
+
+      document.getElementById("resultado").innerHTML +=
+        `<br><br>Valor médio após 10 anos: $${media.toFixed(2)}`;
+    }
+
+    // Gráfico de pizza do portfólio
+    const ctx = document.getElementById('grafico');
+    new Chart(ctx, {
+      type: 'pie',
+      data: {
+        labels: ['BTC','AAPL','NVDA','SPY'],
+        datasets: [{
+          data: [30,25,20,25],
+          backgroundColor: ['#ff6384','#36a2eb','#ffcd56','#4bc0c0']
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  </script>
+</body>
+  </html>
