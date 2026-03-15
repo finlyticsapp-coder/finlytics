@@ -54,9 +54,9 @@ button:hover { background:#1d4ed8; }
 
 <script>
 // ================= Supabase =================
-const SUPABASE_URL = "COLE_AQUI_SUA_URL";
-const SUPABASE_KEY = "COLE_AQUI_SUA_ANON_KEY";
-const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = "https://dcfaxuoamqdsjwsugvpu.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZmF4dW9hbXFkc2p3c3ZndnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMjUzMjYsImV4cCI6MjA4NzkwMTMyNn0.IWYyvbWQKDEIcUnVmaY80E6PfwAzsa1jzH7ZgjCZ53I";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let user = null;
 
 // ================= Ativos =================
@@ -71,22 +71,20 @@ let chart, monteChart;
 async function login(){
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
-  document.getElementById("loginFeedback").innerText = "";
+  const feedback = document.getElementById("loginFeedback");
+  feedback.innerText = "";
 
-  if(!email || !password){ 
-    document.getElementById("loginFeedback").innerText = "Preencha todos os campos!";
-    return;
-  }
+  if(!email || !password){ feedback.innerText = "Preencha todos os campos!"; return; }
 
-  // Tenta login
-  const { user: loginUser, error } = await supabase.auth.signInWithPassword({email,password});
+  // Login
+  const { data: loginData, error } = await supabase.auth.signInWithPassword({email,password});
   if(error){
-    // Se erro, tenta registrar
-    const { user: newUser, error: regError } = await supabase.auth.signUp({email,password});
-    if(regError){ document.getElementById("loginFeedback").innerText = regError.message; return;}
-    user = newUser;
-    document.getElementById("loginFeedback").innerText = "Registrado com sucesso!";
-  } else { user = loginUser; }
+    // Sign-up se login falhar
+    const { data: newUser, error: regError } = await supabase.auth.signUp({email,password});
+    if(regError){ feedback.innerText = regError.message; return; }
+    user = newUser.user;
+    feedback.innerText = "Registrado com sucesso!";
+  } else { user = loginData.user; }
 
   document.getElementById("loginBox").style.display="none";
   document.getElementById("appBox").style.display="block";
@@ -101,7 +99,13 @@ function initInputs(){
   ativos.forEach((ativo,i)=>{
     const input = document.createElement("input");
     input.type="number"; input.min=0; input.max=100; input.value=pesos[i]*100;
-    input.onchange=()=>{pesos[i]=input.value/100; criarGrafico();}
+    input.onchange=()=>{
+      pesos[i] = Math.min(Math.max(input.value/100,0),1);
+      if(pesos.reduce((a,b)=>a+b,0)>1){ 
+        document.getElementById("feedback").innerText="Soma dos pesos não pode exceder 100%!";
+      } else { document.getElementById("feedback").innerText=""; }
+      criarGrafico();
+    }
     container.appendChild(input);
   });
 }
@@ -114,8 +118,7 @@ function calcular(){
     risco+=pesos[i]*riscos[i];
   }
   document.getElementById("resultado").innerHTML =
-    "Retorno esperado: "+(retorno*100).toFixed(2)+"%<br>"+
-    "Risco estimado: "+(risco*100).toFixed(2)+"%";
+    `Retorno esperado: ${(retorno*100).toFixed(2)}%<br>Risco estimado: ${(risco*100).toFixed(2)}%`;
   criarGrafico();
 }
 
@@ -135,16 +138,13 @@ function simular(){
   criarGraficoMonteCarlo(resultados);
 }
 
-// ================= Gráfico =================
+// ================= Gráficos =================
 function criarGrafico(){
   const ctx=document.getElementById("grafico");
   if(chart) chart.destroy();
   chart=new Chart(ctx,{
     type:"pie",
-    data:{
-      labels:ativos,
-      datasets:[{data:pesos.map(p=>p*100), backgroundColor:["#f59e0b","#3b82f6","#10b981","#ef4444"]}]
-    },
+    data:{labels:ativos,datasets:[{data:pesos.map(p=>p*100),backgroundColor:["#f59e0b","#3b82f6","#10b981","#ef4444"]}]},
     options:{plugins:{legend:{position:"bottom"}}}
   });
 }
@@ -164,11 +164,19 @@ async function salvarPortfolio(){
   if(!user){ document.getElementById("feedback").innerText="Faça login antes!"; return; }
   const name = prompt("Nome do portfólio:");
   if(!name){ document.getElementById("feedback").innerText="Nome inválido."; return; }
-  const { data, error } = await supabase.from("portfolios").insert([{name, owner_id:user.id, assets:JSON.stringify(pesos)}]);
+
+  const portfolioData = {
+    ativos,
+    pesos,
+    retornos,
+    riscos
+  };
+
+  const { data, error } = await supabase.from("portfolios").insert([{name, owner_id:user.id, assets:portfolioData}]);
   if(error){ document.getElementById("feedback").innerText=error.message; } 
   else { document.getElementById("feedback").innerText="Portfólio salvo com sucesso!"; }
 }
 </script>
 
 </body>
-</html>
+  </html>
