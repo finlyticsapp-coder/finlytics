@@ -1,126 +1,85 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<title>Finlytics AI</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<style>
-  body { font-family: Arial, sans-serif; padding: 20px; }
-  #resultado { margin-top: 20px; }
-  canvas { max-width: 600px; margin-top: 20px; }
-</style>
-</head>
-<body>
-
-<h1>Finlytics AI - Plataforma Financeira</h1>
-
-<button onclick="calcular()">Calcular análise</button>
-<button onclick="simulacaoMonteCarlo()">Simular 10 anos</button>
-
-<div id="resultado"></div>
-<canvas id="grafico"></canvas>
-<canvas id="fronteira" height="400"></canvas>
+<!-- Otimização de Portfólio -->
+<div class="container">
+  <button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
+  <canvas id="fronteira" width="400" height="400" style="margin-top:20px;"></canvas>
+  <div class="result" id="resultado"></div>
+</div>
 
 <script>
-// Dados iniciais
-const pesos = [0.30, 0.25, 0.20, 0.25];
+// ================= Ativos (mesmos do index.html) =================
+const ativos = ["BTC","AAPL","NVDA","SPY"];
 const retornos = [0.15, 0.12, 0.18, 0.10];
 const riscos = [0.40, 0.30, 0.35, 0.20];
-const labels = ['BTC','AAPL','NVDA','SPY'];
 
-// Passo 1: cálculo de retorno e risco
-function calcular() {
-  let retornoEsperado = 0;
-  let riscoTotal = 0;
+let fronteiraChart = null;
 
-  for (let i = 0; i < pesos.length; i++) {
-    retornoEsperado += pesos[i] * retornos[i];
-    riscoTotal += pesos[i] * riscos[i];
-  }
-
-  document.getElementById("resultado").innerHTML =
-    "Retorno esperado: " + (retornoEsperado * 100).toFixed(2) + "%<br>" +
-    "Risco estimado: " + (riscoTotal * 100).toFixed(2) + "%";
-  
-  desenharGraficoPizza();
-  desenharFronteira();
-}
-
-// Passo 2: simulação Monte Carlo
-function simulacaoMonteCarlo() {
-  let simulacoes = 1000;
-  let valorInicial = 10000;
-  let resultados = [];
-
-  for (let i = 0; i < simulacoes; i++) {
-    let valor = valorInicial;
-    for (let ano = 0; ano < 10; ano++) {
-      let retornoAleatorio = (Math.random() * 0.20) - 0.05; 
-      valor = valor * (1 + retornoAleatorio);
-    }
-    resultados.push(valor);
-  }
-
-  let media = resultados.reduce((a,b) => a+b,0)/simulacoes;
-  document.getElementById("resultado").innerHTML +=
-    "<br><br>Valor médio após 10 anos: $" + media.toFixed(2);
-}
-
-// Passo 3: gráfico de pizza
-function desenharGraficoPizza() {
-  const ctx = document.getElementById('grafico');
-  new Chart(ctx, {
-    type: 'pie',
-    data: {
-      labels: labels,
-      datasets: [{
-        data: pesos.map(p => p*100),
-        backgroundColor: ['#FF6384','#36A2EB','#FFCE56','#4BC0C0']
-      }]
-    }
-  });
-}
-
-// Passo 4: fronteira eficiente
-function desenharFronteira() {
-  const ctx = document.getElementById('fronteira');
-  const pontos = [];
+// ================= Função de Otimização =================
+function otimizarPortfolio() {
+  const rf = 0.02; // taxa livre de risco
   const passos = 50;
+  let melhorSharpe = -Infinity;
+  let melhorPort = {};
+  const pontos = [];
 
   for (let w1 = 0; w1 <= 1; w1 += 1/passos) {
     for (let w2 = 0; w2 <= 1-w1; w2 += 1/passos) {
       for (let w3 = 0; w3 <= 1-w1-w2; w3 += 1/passos) {
         let w4 = 1 - w1 - w2 - w3;
         if (w4 < 0) continue;
+
         let r = w1*retornos[0] + w2*retornos[1] + w3*retornos[2] + w4*retornos[3];
-        let s = Math.sqrt(Math.pow(w1*riscos[0],2)+
-                          Math.pow(w2*riscos[1],2)+
-                          Math.pow(w3*riscos[2],2)+
+        let s = Math.sqrt(Math.pow(w1*riscos[0],2) +
+                          Math.pow(w2*riscos[1],2) +
+                          Math.pow(w3*riscos[2],2) +
                           Math.pow(w4*riscos[3],2));
+        let sharpe = (r - rf)/s;
+
         pontos.push({x: s*100, y: r*100});
+
+        if (sharpe > melhorSharpe) {
+          melhorSharpe = sharpe;
+          melhorPort = {x: s*100, y: r*100, w:[w1,w2,w3,w4], sharpe};
+        }
       }
     }
   }
 
-  new Chart(ctx, {
+  // ================= Desenhar gráfico =================
+  const ctx = document.getElementById('fronteira');
+  if(fronteiraChart) fronteiraChart.destroy(); // destrói gráfico antigo
+  fronteiraChart = new Chart(ctx, {
     type: 'scatter',
     data: {
-      datasets: [{
-        label: 'Fronteira eficiente',
-        data: pontos,
-        pointRadius: 2,
-        backgroundColor: '#36A2EB'
-      }]
+      datasets: [
+        {
+          label: 'Fronteira eficiente',
+          data: pontos,
+          pointRadius: 2,
+          backgroundColor: '#36A2EB'
+        },
+        {
+          label: 'Melhor Sharpe',
+          data: [{x: melhorPort.x, y: melhorPort.y}],
+          pointRadius: 6,
+          backgroundColor: '#FF0000'
+        }
+      ]
     },
     options: {
+      plugins: { legend: { position: 'bottom' } },
       scales: {
         x: { title: { display:true, text:'Risco (%)' } },
         y: { title: { display:true, text:'Retorno (%)' } }
       }
     }
   });
+
+  // ================= Exibir resultados =================
+  document.getElementById("resultado").innerHTML =
+    `<br><strong>Melhor portfólio (Sharpe Ratio: ${melhorSharpe.toFixed(2)}):</strong>
+     <br>BTC: ${(melhorPort.w[0]*100).toFixed(1)}%
+     <br>AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%
+     <br>NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%
+     <br>SPY: ${(melhorPort.w[3]*100).toFixed(1)}%`;
 }
 </script>
-
-</body>
-</html>
