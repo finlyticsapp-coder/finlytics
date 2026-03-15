@@ -1,182 +1,468 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Finlytics AI - Plataforma de Portfólio</title>
+
+<title>Finlytics AI</title>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
 <style>
-body { font-family: Arial; background: #0f172a; color: white; margin:0; padding:0; }
-.container { max-width:900px; margin:auto; padding:40px 20px; }
-h1, h2 { text-align:center; margin:0 0 15px 0; }
-.buttons { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin:20px 0; }
-button { padding:12px 20px; border:none; background:#2563eb; color:white; border-radius:6px; cursor:pointer; font-size:16px; }
-button:hover { background:#1d4ed8; }
-.result { margin-top:30px; text-align:center; font-size:18px; }
-.chart { margin-top:40px; }
-.input-row { display:flex; justify-content:center; gap:10px; margin:10px 0; }
-.input-row input { width:60px; padding:5px; border-radius:5px; border:none; text-align:center; }
-.feedback { text-align:center; margin-top:15px; color:#10b981; font-weight:bold; }
-.login { max-width:400px; margin:auto; background:#1e293b; padding:20px; border-radius:10px; margin-top:50px; }
-.login input { width:100%; padding:10px; margin:10px 0; border-radius:5px; border:none; }
-.login button { width:100%; }
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+margin:0;
+padding:0;
+}
+
+.container{
+max-width:900px;
+margin:auto;
+padding:40px 20px;
+}
+
+h1,h2{
+text-align:center;
+}
+
+.buttons{
+display:flex;
+gap:10px;
+justify-content:center;
+flex-wrap:wrap;
+margin:20px 0;
+}
+
+button{
+padding:12px 20px;
+border:none;
+background:#2563eb;
+color:white;
+border-radius:6px;
+cursor:pointer;
+}
+
+button:hover{
+background:#1d4ed8;
+}
+
+.result{
+margin-top:20px;
+text-align:center;
+font-size:18px;
+}
+
+.chart{
+margin-top:40px;
+}
+
+.input-row{
+display:flex;
+justify-content:center;
+gap:10px;
+margin:10px 0;
+}
+
+.input-row input{
+width:60px;
+padding:5px;
+border-radius:5px;
+border:none;
+text-align:center;
+}
+
+.feedback{
+text-align:center;
+margin-top:15px;
+color:#10b981;
+font-weight:bold;
+}
+
+.login{
+max-width:400px;
+margin:auto;
+background:#1e293b;
+padding:20px;
+border-radius:10px;
+margin-top:50px;
+}
+
+.login input{
+width:100%;
+padding:10px;
+margin:10px 0;
+border-radius:5px;
+border:none;
+}
+
 </style>
+
 </head>
+
 <body>
 
 <div class="login" id="loginBox">
+
 <h2>Login Finlytics AI</h2>
+
 <input type="email" id="email" placeholder="Email">
 <input type="password" id="password" placeholder="Senha">
+
 <button onclick="login()">Entrar / Registrar</button>
-<div class="feedback" id="loginFeedback"></div>
+
+<div id="loginFeedback" class="feedback"></div>
+
 </div>
+
 
 <div class="container" id="appBox" style="display:none;">
+
 <h1>Finlytics AI</h1>
-<h2>Plataforma de análise de portfólio</h2>
+<h2>Análise Inteligente de Portfólio</h2>
 
 <div class="buttons">
-<button onclick="calcular()">Calcular Retorno & Risco</button>
-<button onclick="simular()">Simulação Monte Carlo</button>
-<button onclick="salvarPortfolio()">Salvar Portfólio</button>
+
+<button onclick="calcular()">Calcular Retorno</button>
+
+<button onclick="simular()">Monte Carlo</button>
+
+<button onclick="salvarPortfolio()">Salvar</button>
+
 </div>
 
-<div class="input-row" id="inputsPesos"></div>
-<div class="result" id="resultado"></div>
+<div id="inputsPesos" class="input-row"></div>
+
+<div id="resultado" class="result"></div>
+
 <div class="chart">
+
 <canvas id="grafico"></canvas>
-<canvas id="monteCarlo" style="margin-top:40px;"></canvas>
+
+<canvas id="monteCarlo"></canvas>
+
 </div>
-<div class="feedback" id="feedback"></div>
+
+<div id="feedback" class="feedback"></div>
+
 </div>
+
 
 <script>
-// ================= Supabase =================
-const SUPABASE_URL = "https://dcfaxuoamqdsjwsugvpu.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZmF4dW9hbXFkc2p3c3ZndnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMjUzMjYsImV4cCI6MjA4NzkwMTMyNn0.IWYyvbWQKDEIcUnVmaY80E6PfwAzsa1jzH7ZgjCZ53I";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-let user = null;
 
-// ================= Ativos =================
-const ativos = ["BTC","AAPL","NVDA","SPY"];
-let pesos = [0.30,0.25,0.20,0.25];
-const retornos = [0.15,0.12,0.18,0.10];
-const riscos = [0.40,0.30,0.35,0.20];
+// SUPABASE
 
-let chart, monteChart;
+const SUPABASE_URL="https://dcfaxuoamqdsjwsugvpu.supabase.co"
 
-// ================= Login =================
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
+
+let user=null
+
+
+// ATIVOS
+
+const ativos=["BTC","AAPL","NVDA","SPY"]
+
+let pesos=[0.30,0.25,0.20,0.25]
+
+const retornos=[0.15,0.12,0.18,0.10]
+
+const riscos=[0.40,0.30,0.35,0.20]
+
+let chart
+let monteChart
+
+
+
+// LOGIN
+
 async function login(){
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const feedback = document.getElementById("loginFeedback");
-  feedback.innerText = "";
 
-  if(!email || !password){ feedback.innerText = "Preencha todos os campos!"; return; }
+const email=document.getElementById("email").value
 
-  // Login
-  const { data: loginData, error } = await supabase.auth.signInWithPassword({email,password});
-  if(error){
-    // Sign-up se login falhar
-    const { data: newUser, error: regError } = await supabase.auth.signUp({email,password});
-    if(regError){ feedback.innerText = regError.message; return; }
-    user = newUser.user;
-    feedback.innerText = "Registrado com sucesso!";
-  } else { user = loginData.user; }
+const password=document.getElementById("password").value
 
-  document.getElementById("loginBox").style.display="none";
-  document.getElementById("appBox").style.display="block";
-  initInputs();
-  criarGrafico();
+const feedback=document.getElementById("loginFeedback")
+
+feedback.innerText=""
+
+if(!email||!password){
+
+feedback.innerText="Preencha os campos"
+
+return
+
 }
 
-// ================= Interface de edição =================
+const {data,error}=await supabaseClient.auth.signInWithPassword({
+
+email,
+password
+
+})
+
+if(error){
+
+const {data:newUser,error:regError}=await supabaseClient.auth.signUp({
+
+email,
+password
+
+})
+
+if(regError){
+
+feedback.innerText=regError.message
+
+return
+
+}
+
+user=newUser.user
+
+feedback.innerText="Conta criada!"
+
+}
+
+else{
+
+user=data.user
+
+}
+
+document.getElementById("loginBox").style.display="none"
+
+document.getElementById("appBox").style.display="block"
+
+initInputs()
+
+criarGrafico()
+
+}
+
+
+
+// INPUTS
+
 function initInputs(){
-  const container = document.getElementById("inputsPesos");
-  container.innerHTML = "";
-  ativos.forEach((ativo,i)=>{
-    const input = document.createElement("input");
-    input.type="number"; input.min=0; input.max=100; input.value=pesos[i]*100;
-    input.onchange=()=>{
-      pesos[i] = Math.min(Math.max(input.value/100,0),1);
-      if(pesos.reduce((a,b)=>a+b,0)>1){ 
-        document.getElementById("feedback").innerText="Soma dos pesos não pode exceder 100%!";
-      } else { document.getElementById("feedback").innerText=""; }
-      criarGrafico();
-    }
-    container.appendChild(input);
-  });
+
+const container=document.getElementById("inputsPesos")
+
+container.innerHTML=""
+
+ativos.forEach((ativo,i)=>{
+
+const input=document.createElement("input")
+
+input.type="number"
+
+input.min=0
+
+input.max=100
+
+input.value=pesos[i]*100
+
+input.onchange=()=>{
+
+pesos[i]=input.value/100
+
+if(pesos.reduce((a,b)=>a+b,0)>1){
+
+document.getElementById("feedback").innerText="Peso total não pode passar de 100%"
+
 }
 
-// ================= Calcular =================
+else{
+
+document.getElementById("feedback").innerText=""
+
+}
+
+criarGrafico()
+
+}
+
+container.appendChild(input)
+
+})
+
+}
+
+
+
+// CALCULAR
+
 function calcular(){
-  let retorno=0, risco=0;
-  for(let i=0;i<pesos.length;i++){
-    retorno+=pesos[i]*retornos[i];
-    risco+=pesos[i]*riscos[i];
-  }
-  document.getElementById("resultado").innerHTML =
-    `Retorno esperado: ${(retorno*100).toFixed(2)}%<br>Risco estimado: ${(risco*100).toFixed(2)}%`;
-  criarGrafico();
+
+let retorno=0
+
+let risco=0
+
+for(let i=0;i<pesos.length;i++){
+
+retorno+=pesos[i]*retornos[i]
+
+risco+=pesos[i]*riscos[i]
+
 }
 
-// ================= Monte Carlo =================
+document.getElementById("resultado").innerHTML=
+
+`Retorno esperado: ${(retorno*100).toFixed(2)}%
+
+<br>
+
+Risco estimado: ${(risco*100).toFixed(2)}%`
+
+}
+
+
+
+// MONTE CARLO
+
 function simular(){
-  let simulacoes=1000, valorInicial=10000, resultados=[];
-  for(let i=0;i<simulacoes;i++){
-    let valor=valorInicial;
-    for(let ano=0;ano<10;ano++){
-      let r=(Math.random()*0.20)-0.05;
-      valor*=1+r;
-    }
-    resultados.push(valor);
-  }
-  const media = resultados.reduce((a,b)=>a+b,0)/simulacoes;
-  document.getElementById("resultado").innerHTML += `<br><br>Valor médio após 10 anos: $${media.toFixed(2)}`;
-  criarGraficoMonteCarlo(resultados);
+
+let simulacoes=1000
+
+let valorInicial=10000
+
+let resultados=[]
+
+for(let i=0;i<simulacoes;i++){
+
+let valor=valorInicial
+
+for(let ano=0;ano<10;ano++){
+
+let r=(Math.random()*0.20)-0.05
+
+valor*=1+r
+
 }
 
-// ================= Gráficos =================
-function criarGrafico(){
-  const ctx=document.getElementById("grafico");
-  if(chart) chart.destroy();
-  chart=new Chart(ctx,{
-    type:"pie",
-    data:{labels:ativos,datasets:[{data:pesos.map(p=>p*100),backgroundColor:["#f59e0b","#3b82f6","#10b981","#ef4444"]}]},
-    options:{plugins:{legend:{position:"bottom"}}}
-  });
+resultados.push(valor)
+
 }
+
+criarGraficoMonteCarlo(resultados)
+
+}
+
+
+
+// GRÁFICOS
+
+function criarGrafico(){
+
+const ctx=document.getElementById("grafico")
+
+if(chart)chart.destroy()
+
+chart=new Chart(ctx,{
+
+type:"pie",
+
+data:{
+
+labels:ativos,
+
+datasets:[{
+
+data:pesos.map(p=>p*100),
+
+backgroundColor:["#f59e0b","#3b82f6","#10b981","#ef4444"]
+
+}]
+
+}
+
+})
+
+}
+
+
 
 function criarGraficoMonteCarlo(resultados){
-  const ctx=document.getElementById("monteCarlo");
-  if(monteChart) monteChart.destroy();
-  monteChart=new Chart(ctx,{
-    type:"line",
-    data:{labels:resultados.map((_,i)=>i+1), datasets:[{label:"Simulação", data:resultados, borderColor:"#36a2eb", fill:false}]},
-    options:{plugins:{legend:{display:false}}, scales:{x:{title:{display:true,text:"Simulação"}},y:{title:{display:true,text:"Valor"}}}}
-  });
+
+const ctx=document.getElementById("monteCarlo")
+
+if(monteChart)monteChart.destroy()
+
+monteChart=new Chart(ctx,{
+
+type:"line",
+
+data:{
+
+labels:resultados.map((_,i)=>i+1),
+
+datasets:[{
+
+data:resultados,
+
+borderColor:"#36a2eb"
+
+}]
+
 }
 
-// ================= Salvar Portfólio =================
+})
+
+}
+
+
+
+// SALVAR
+
 async function salvarPortfolio(){
-  if(!user){ document.getElementById("feedback").innerText="Faça login antes!"; return; }
-  const name = prompt("Nome do portfólio:");
-  if(!name){ document.getElementById("feedback").innerText="Nome inválido."; return; }
 
-  const portfolioData = {
-    ativos,
-    pesos,
-    retornos,
-    riscos
-  };
+if(!user){
 
-  const { data, error } = await supabase.from("portfolios").insert([{name, owner_id:user.id, assets:portfolioData}]);
-  if(error){ document.getElementById("feedback").innerText=error.message; } 
-  else { document.getElementById("feedback").innerText="Portfólio salvo com sucesso!"; }
+document.getElementById("feedback").innerText="Faça login"
+
+return
+
 }
+
+const name=prompt("Nome do portfólio")
+
+if(!name)return
+
+const {error}=await supabaseClient
+
+.from("portfolios")
+
+.insert([{
+
+name,
+
+owner_id:user.id,
+
+assets:{ativos,pesos,retornos,riscos}
+
+}])
+
+if(error){
+
+document.getElementById("feedback").innerText=error.message
+
+}
+
+else{
+
+document.getElementById("feedback").innerText="Portfólio salvo!"
+
+}
+
+}
+
 </script>
 
 </body>
-  </html>
+</html>
