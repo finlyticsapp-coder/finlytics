@@ -1,85 +1,214 @@
-<!-- Otimização de Portfólio -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Finlytics AI - Otimização de Portfólio</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+margin:0;
+padding:0;
+}
+
+.container{
+max-width:900px;
+margin:auto;
+padding:40px 20px;
+text-align:center;
+}
+
+button{
+padding:12px 20px;
+border:none;
+background:#2563eb;
+color:white;
+border-radius:6px;
+cursor:pointer;
+margin-bottom:20px;
+}
+
+button:hover{
+background:#1d4ed8;
+}
+
+.result{
+margin-top:20px;
+font-size:18px;
+}
+
+</style>
+
+</head>
+
+<body>
+
 <div class="container">
-  <button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
-  <canvas id="fronteira" width="400" height="400" style="margin-top:20px;"></canvas>
-  <div class="result" id="resultado"></div>
+
+<h2>Otimização de Portfólio (Sharpe Ratio)</h2>
+
+<button onclick="otimizarPortfolio()">
+Otimizar Portfólio
+</button>
+
+<canvas id="fronteira"></canvas>
+
+<div id="resultado" class="result"></div>
+
 </div>
 
 <script>
-// ================= Ativos (mesmos do index.html) =================
-const ativos = ["BTC","AAPL","NVDA","SPY"];
-const retornos = [0.15, 0.12, 0.18, 0.10];
-const riscos = [0.40, 0.30, 0.35, 0.20];
 
-let fronteiraChart = null;
+// ativos
 
-// ================= Função de Otimização =================
-function otimizarPortfolio() {
-  const rf = 0.02; // taxa livre de risco
-  const passos = 50;
-  let melhorSharpe = -Infinity;
-  let melhorPort = {};
-  const pontos = [];
+const ativos = ["BTC","AAPL","NVDA","SPY"]
 
-  for (let w1 = 0; w1 <= 1; w1 += 1/passos) {
-    for (let w2 = 0; w2 <= 1-w1; w2 += 1/passos) {
-      for (let w3 = 0; w3 <= 1-w1-w2; w3 += 1/passos) {
-        let w4 = 1 - w1 - w2 - w3;
-        if (w4 < 0) continue;
+const retornos = [0.15,0.12,0.18,0.10]
 
-        let r = w1*retornos[0] + w2*retornos[1] + w3*retornos[2] + w4*retornos[3];
-        let s = Math.sqrt(Math.pow(w1*riscos[0],2) +
-                          Math.pow(w2*riscos[1],2) +
-                          Math.pow(w3*riscos[2],2) +
-                          Math.pow(w4*riscos[3],2));
-        let sharpe = (r - rf)/s;
+const riscos = [0.40,0.30,0.35,0.20]
 
-        pontos.push({x: s*100, y: r*100});
+let fronteiraChart = null
 
-        if (sharpe > melhorSharpe) {
-          melhorSharpe = sharpe;
-          melhorPort = {x: s*100, y: r*100, w:[w1,w2,w3,w4], sharpe};
-        }
-      }
-    }
-  }
 
-  // ================= Desenhar gráfico =================
-  const ctx = document.getElementById('fronteira');
-  if(fronteiraChart) fronteiraChart.destroy(); // destrói gráfico antigo
-  fronteiraChart = new Chart(ctx, {
-    type: 'scatter',
-    data: {
-      datasets: [
-        {
-          label: 'Fronteira eficiente',
-          data: pontos,
-          pointRadius: 2,
-          backgroundColor: '#36A2EB'
-        },
-        {
-          label: 'Melhor Sharpe',
-          data: [{x: melhorPort.x, y: melhorPort.y}],
-          pointRadius: 6,
-          backgroundColor: '#FF0000'
-        }
-      ]
-    },
-    options: {
-      plugins: { legend: { position: 'bottom' } },
-      scales: {
-        x: { title: { display:true, text:'Risco (%)' } },
-        y: { title: { display:true, text:'Retorno (%)' } }
-      }
-    }
-  });
+function otimizarPortfolio(){
 
-  // ================= Exibir resultados =================
-  document.getElementById("resultado").innerHTML =
-    `<br><strong>Melhor portfólio (Sharpe Ratio: ${melhorSharpe.toFixed(2)}):</strong>
-     <br>BTC: ${(melhorPort.w[0]*100).toFixed(1)}%
-     <br>AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%
-     <br>NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%
-     <br>SPY: ${(melhorPort.w[3]*100).toFixed(1)}%`;
+const rf = 0.02
+const passos = 40
+
+let melhorSharpe = -Infinity
+let melhorPort = null
+
+const pontos = []
+
+for(let w1=0; w1<=1; w1+=1/passos){
+
+for(let w2=0; w2<=1-w1; w2+=1/passos){
+
+for(let w3=0; w3<=1-w1-w2; w3+=1/passos){
+
+let w4 = 1 - w1 - w2 - w3
+
+if(w4 < 0) continue
+
+let r =
+w1*retornos[0] +
+w2*retornos[1] +
+w3*retornos[2] +
+w4*retornos[3]
+
+let s = Math.sqrt(
+Math.pow(w1*riscos[0],2) +
+Math.pow(w2*riscos[1],2) +
+Math.pow(w3*riscos[2],2) +
+Math.pow(w4*riscos[3],2)
+)
+
+let sharpe = (r - rf) / s
+
+pontos.push({
+x: s*100,
+y: r*100
+})
+
+if(sharpe > melhorSharpe){
+
+melhorSharpe = sharpe
+
+melhorPort = {
+w:[w1,w2,w3,w4],
+risco:s,
+retorno:r
 }
+
+}
+
+}
+
+}
+
+}
+
+if(!melhorPort){
+
+document.getElementById("resultado").innerHTML="Erro ao calcular otimização."
+
+return
+
+}
+
+
+// gráfico
+
+const ctx = document.getElementById("fronteira")
+
+if(fronteiraChart) fronteiraChart.destroy()
+
+fronteiraChart = new Chart(ctx,{
+
+type:"scatter",
+
+data:{
+datasets:[
+{
+label:"Fronteira eficiente",
+data:pontos,
+backgroundColor:"#36A2EB",
+pointRadius:2
+},
+{
+label:"Melhor Sharpe",
+data:[{
+x:melhorPort.risco*100,
+y:melhorPort.retorno*100
+}],
+backgroundColor:"red",
+pointRadius:7
+}
+]
+},
+
+options:{
+plugins:{
+legend:{position:"bottom"}
+},
+scales:{
+x:{title:{display:true,text:"Risco (%)"}},
+y:{title:{display:true,text:"Retorno (%)"}}
+}
+}
+
+})
+
+
+// resultado
+
+let resultadoHTML =
+`<b>Melhor portfólio encontrado</b><br><br>`
+
+ativos.forEach((ativo,i)=>{
+
+resultadoHTML +=
+`${ativo}: ${(melhorPort.w[i]*100).toFixed(1)}%<br>`
+
+})
+
+resultadoHTML +=
+`<br>Sharpe Ratio: ${melhorSharpe.toFixed(2)}`
+
+document.getElementById("resultado").innerHTML = resultadoHTML
+
+}
+
 </script>
+
+</body>
+</html>
