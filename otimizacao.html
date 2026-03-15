@@ -1,17 +1,24 @@
-<!-- Botão para otimização do portfólio -->
-<button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
-
-<!-- Canvas para a fronteira eficiente -->
-<canvas id="fronteira" width="400" height="400"></canvas>
+<!-- Otimização de Portfólio -->
+<div class="container">
+  <button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
+  <canvas id="fronteira" width="400" height="400" style="margin-top:20px;"></canvas>
+  <div class="result" id="resultado"></div>
+</div>
 
 <script>
-// Passo 4: Melhor portfólio pelo Sharpe Ratio
+// ================= Ativos (mesmos do index.html) =================
+const ativos = ["BTC","AAPL","NVDA","SPY"];
+const retornos = [0.15, 0.12, 0.18, 0.10];
+const riscos = [0.40, 0.30, 0.35, 0.20];
+
+let fronteiraChart = null;
+
+// ================= Função de Otimização =================
 function otimizarPortfolio() {
   const rf = 0.02; // taxa livre de risco
   const passos = 50;
   let melhorSharpe = -Infinity;
   let melhorPort = {};
-
   const pontos = [];
 
   for (let w1 = 0; w1 <= 1; w1 += 1/passos) {
@@ -37,9 +44,10 @@ function otimizarPortfolio() {
     }
   }
 
-  // Desenhar a fronteira eficiente com melhor Sharpe
+  // ================= Desenhar gráfico =================
   const ctx = document.getElementById('fronteira');
-  new Chart(ctx, {
+  if(fronteiraChart) fronteiraChart.destroy(); // destrói gráfico antigo
+  fronteiraChart = new Chart(ctx, {
     type: 'scatter',
     data: {
       datasets: [
@@ -58,6 +66,7 @@ function otimizarPortfolio() {
       ]
     },
     options: {
+      plugins: { legend: { position: 'bottom' } },
       scales: {
         x: { title: { display:true, text:'Risco (%)' } },
         y: { title: { display:true, text:'Retorno (%)' } }
@@ -65,11 +74,12 @@ function otimizarPortfolio() {
     }
   });
 
-  document.getElementById("resultado").innerHTML +=
-    `<br><br>Melhor portfólio (Sharpe Ratio: ${melhorSharpe.toFixed(2)}):
+  // ================= Exibir resultados =================
+  document.getElementById("resultado").innerHTML =
+    `<br><strong>Melhor portfólio (Sharpe Ratio: ${melhorSharpe.toFixed(2)}):</strong>
      <br>BTC: ${(melhorPort.w[0]*100).toFixed(1)}%
      <br>AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%
      <br>NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%
      <br>SPY: ${(melhorPort.w[3]*100).toFixed(1)}%`;
 }
-    </script>
+  </script>
