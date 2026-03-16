@@ -2,35 +2,58 @@
 -- Complete Portfolios Table SQL (Supabase)
 -- ========================================
 
--- 1️⃣ Criação da tabela portfolios
+-- 1️⃣ Criar tabela
 CREATE TABLE public.portfolios (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  created_at timestamp with time zone NOT NULL DEFAULT (now() AT TIME ZONE 'utc'::text),
-  name text,
-  owner_id uuid,
-  assets jsonb DEFAULT '{}'::jsonb,
-  performance numeric DEFAULT 0,
-  benchmark numeric DEFAULT 0,
-  risk_score numeric DEFAULT 0,
-  last_updated timestamp with time zone DEFAULT now(),
-  CONSTRAINT portfolios_pkey PRIMARY KEY (id)
+
+id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+created_at timestamp with time zone DEFAULT now(),
+
+name text,
+
+owner_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+
+assets jsonb DEFAULT '{}'::jsonb,
+
+performance numeric DEFAULT 0,
+
+benchmark numeric DEFAULT 0,
+
+risk_score numeric DEFAULT 0,
+
+last_updated timestamp with time zone DEFAULT now()
+
 );
 
--- 2️⃣ Habilitar Row-Level Security
+-- 2️⃣ Index para performance
+CREATE INDEX idx_portfolios_owner
+ON public.portfolios(owner_id);
+
+-- 3️⃣ Habilitar Row Level Security
 ALTER TABLE public.portfolios ENABLE ROW LEVEL SECURITY;
 
--- 3️⃣ Políticas RLS
+-- 4️⃣ Políticas de acesso
 
--- Permitir que todos os usuários autenticados acessem a tabela
-CREATE POLICY "allow authenticated users"
+-- Usuário pode ver seus próprios portfólios
+CREATE POLICY "Users can view own portfolios"
 ON public.portfolios
-FOR ALL
-USING (auth.uid() IS NOT NULL)
-WITH CHECK (auth.uid() IS NOT NULL);
+FOR SELECT
+USING (auth.uid() = owner_id);
 
--- Permitir que cada usuário gerencie seus próprios portfólios
-CREATE POLICY "Users can manage their own portfolios"
+-- Usuário pode criar portfólios
+CREATE POLICY "Users can create portfolios"
 ON public.portfolios
-FOR ALL
-USING (auth.uid() = owner_id)
+FOR INSERT
 WITH CHECK (auth.uid() = owner_id);
+
+-- Usuário pode atualizar portfólios próprios
+CREATE POLICY "Users can update portfolios"
+ON public.portfolios
+FOR UPDATE
+USING (auth.uid() = owner_id);
+
+-- Usuário pode deletar portfólios próprios
+CREATE POLICY "Users can delete portfolios"
+ON public.portfolios
+FOR DELETE
+USING (auth.uid() = owner_id);
