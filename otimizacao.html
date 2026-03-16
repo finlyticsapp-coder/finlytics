@@ -1,227 +1,103 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Finlytics AI - Otimização</title>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<!-- Supabase -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
 <style>
-
-body{
-font-family:Arial;
-background:#0f172a;
-color:white;
-margin:0;
-padding:0;
-}
-
-.container{
-max-width:900px;
-margin:auto;
-padding:40px 20px;
-text-align:center;
-}
-
-button{
-padding:12px 20px;
-border:none;
-background:#2563eb;
-color:white;
-border-radius:6px;
-cursor:pointer;
-margin-top:10px;
-}
-
-.result{
-margin-top:20px;
-font-size:18px;
-}
-
+body { font-family: Arial; background: #0f172a; color: white; margin:0; padding:0; }
+.container { max-width:900px; margin:auto; padding:40px 20px; text-align:center; }
+button { padding:12px 20px; border:none; background:#2563eb; color:white; border-radius:6px; cursor:pointer; margin-bottom:20px; }
+button:hover { background:#1d4ed8; }
+canvas { margin-top:20px; }
+.result { margin-top:20px; font-size:18px; }
 </style>
-
 </head>
-
 <body>
 
 <div class="container">
-
-<h1>Otimização de Portfólio</h1>
-
-<button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
-
-<button onclick="salvarPortfolio()">Salvar Portfólio</button>
-
-<canvas id="fronteira" width="400" height="400" style="margin-top:20px;"></canvas>
-
-<div class="result" id="resultado"></div>
-
+  <h1>Finlytics AI - Otimização de Portfólio</h1>
+  <button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
+  <canvas id="fronteira" width="400" height="400"></canvas>
+  <div class="result" id="resultado"></div>
 </div>
 
 <script>
-
-// ================= SUPABASE =================
-
-const supabaseClient = supabase.createClient(
-"https://dcfaxuoamqdsjwsugvpu.supabase.co",
-"sb_publishable_wFSv9W-PSccpep9ApyVtTA_5NzDbXvd"
-)
+// ================= Supabase =================
+const SUPABASE_URL = "https://dcfaxuoamqdsjwsugvpu.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZmF4dW9hbXFkc2p3c3ZndnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMjUzMjYsImV4cCI6MjA4NzkwMTMyNn0.IWYyvbWQKDEIcUnVmaY80E6PfwAzsa1jzH7ZgjCZ53I";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ================= Ativos =================
+const ativos = ["BTC","AAPL","NVDA","SPY"];
+const retornos = [0.15,0.12,0.18,0.10];
+const riscos = [0.40,0.30,0.35,0.20];
 
-const ativos = ["BTC","AAPL","NVDA","SPY"]
+let fronteiraChart = null;
 
-const retornos = [0.15,0.12,0.18,0.10]
+// ================= Função de Otimização =================
+async function otimizarPortfolio() {
+  const rf = 0.02; // taxa livre de risco
+  const passos = 50;
+  let melhorSharpe = -Infinity;
+  let melhorPort = {};
+  const pontos = [];
 
-const riscos = [0.40,0.30,0.35,0.20]
+  for (let w1=0; w1<=1; w1+=1/passos){
+    for (let w2=0; w2<=1-w1; w2+=1/passos){
+      for (let w3=0; w3<=1-w1-w2; w3+=1/passos){
+        let w4 = 1-w1-w2-w3;
+        if(w4<0) continue;
 
-let fronteiraChart = null
-let melhorPort = null
+        let r = w1*retornos[0] + w2*retornos[1] + w3*retornos[2] + w4*retornos[3];
+        let s = Math.sqrt(Math.pow(w1*riscos[0],2) + Math.pow(w2*riscos[1],2) + Math.pow(w3*riscos[2],2) + Math.pow(w4*riscos[3],2));
+        let sharpe = (r - rf)/s;
 
-// ================= OTIMIZAÇÃO =================
+        pontos.push({x: s*100, y: r*100});
 
-function otimizarPortfolio(){
+        if(sharpe > melhorSharpe){
+          melhorSharpe = sharpe;
+          melhorPort = {x:s*100, y:r*100, w:[w1,w2,w3,w4], sharpe};
+        }
+      }
+    }
+  }
 
-const rf = 0.02
-const passos = 50
+  // ================= Gráfico =================
+  const ctx = document.getElementById('fronteira');
+  if(fronteiraChart) fronteiraChart.destroy();
+  fronteiraChart = new Chart(ctx, {
+    type:'scatter',
+    data:{
+      datasets:[
+        { label:'Fronteira eficiente', data:pontos, pointRadius:2, backgroundColor:'#36A2EB' },
+        { label:'Melhor Sharpe', data:[{x:melhorPort.x, y:melhorPort.y}], pointRadius:6, backgroundColor:'#FF0000' }
+      ]
+    },
+    options:{
+      plugins:{ legend:{ position:'bottom' } },
+      scales:{ 
+        x:{ title:{ display:true, text:'Risco (%)' } },
+        y:{ title:{ display:true, text:'Retorno (%)' } }
+      }
+    }
+  });
 
-let melhorSharpe = -Infinity
+  // ================= Exibir resultados =================
+  document.getElementById("resultado").innerHTML =
+    `<strong>Melhor portfólio (Sharpe Ratio: ${melhorSharpe.toFixed(2)}):</strong>
+     <br>BTC: ${(melhorPort.w[0]*100).toFixed(1)}%
+     <br>AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%
+     <br>NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%
+     <br>SPY: ${(melhorPort.w[3]*100).toFixed(1)}%`;
 
-const pontos = []
-
-for (let w1 = 0; w1 <= 1; w1 += 1/passos){
-for (let w2 = 0; w2 <= 1-w1; w2 += 1/passos){
-for (let w3 = 0; w3 <= 1-w1-w2; w3 += 1/passos){
-
-let w4 = 1 - w1 - w2 - w3
-
-if(w4 < 0) continue
-
-let r =
-w1*retornos[0] +
-w2*retornos[1] +
-w3*retornos[2] +
-w4*retornos[3]
-
-let s = Math.sqrt(
-Math.pow(w1*riscos[0],2)+
-Math.pow(w2*riscos[1],2)+
-Math.pow(w3*riscos[2],2)+
-Math.pow(w4*riscos[3],2)
-)
-
-let sharpe = (r-rf)/s
-
-pontos.push({x:s,y:r})
-
-if(sharpe > melhorSharpe){
-
-melhorSharpe = sharpe
-
-melhorPort = {
-w:[w1,w2,w3,w4],
-retorno:r,
-risco:s
+  // ================= Salvar portfólio automaticamente =================
+  const nome = `Portfólio Sharpe - ${new Date().toLocaleDateString()}`;
+  const portfolioData = { ativos, pesos: melhorPort.w, retornos, riscos };
+  await supabase.from("portfolios").insert([{name: nome, owner_id: supabase.auth.user()?.id, assets: portfolioData}]);
 }
-
-}
-
-}
-}
-}
-
-// Mostrar resultado
-
-document.getElementById("resultado").innerHTML =
-`
-Melhor Portfólio<br><br>
-
-BTC: ${(melhorPort.w[0]*100).toFixed(1)}%<br>
-AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%<br>
-NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%<br>
-SPY: ${(melhorPort.w[3]*100).toFixed(1)}%<br><br>
-
-Retorno esperado: ${(melhorPort.retorno*100).toFixed(2)}%<br>
-Risco: ${(melhorPort.risco*100).toFixed(2)}%
-`
-
-// Gráfico
-
-if(fronteiraChart){
-fronteiraChart.destroy()
-}
-
-fronteiraChart = new Chart(
-document.getElementById("fronteira"),
-{
-type:"scatter",
-data:{
-datasets:[{
-label:"Fronteira eficiente",
-data:pontos
-}]
-}
-}
-)
-
-}
-
-// ================= SALVAR PORTFÓLIO =================
-
-async function salvarPortfolio(){
-
-if(!melhorPort){
-
-alert("Primeiro otimize o portfólio!")
-
-return
-
-}
-
-const portfolio = {
-
-name:"Portfolio AI",
-
-assets:{
-BTC:melhorPort.w[0],
-AAPL:melhorPort.w[1],
-NVDA:melhorPort.w[2],
-SPY:melhorPort.w[3]
-},
-
-performance:melhorPort.retorno,
-
-risk_score:melhorPort.risco
-
-}
-
-const {data,error} = await supabaseClient
-.from("portfolios")
-.insert([portfolio])
-
-if(error){
-
-alert("Erro ao salvar portfólio")
-
-console.log(error)
-
-}else{
-
-alert("Portfólio salvo com sucesso!")
-
-console.log(data)
-
-}
-
-}
-
 </script>
 
 </body>
