@@ -10,6 +10,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
 <style>
 
 body{
@@ -34,11 +37,7 @@ background:#2563eb;
 color:white;
 border-radius:6px;
 cursor:pointer;
-margin-bottom:20px;
-}
-
-button:hover{
-background:#1d4ed8;
+margin-top:10px;
 }
 
 .result{
@@ -54,196 +53,176 @@ font-size:18px;
 
 <div class="container">
 
-<h2>Otimização de Portfólio (Sharpe Ratio)</h2>
+<h1>Otimização de Portfólio</h1>
 
-<button onclick="otimizarPortfolio()">
-Otimizar Portfólio
-</button>
+<button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
 
-<canvas id="fronteira"></canvas>
+<button onclick="salvarPortfolio()">Salvar Portfólio</button>
 
-<div id="resultado" class="result"></div>
+<canvas id="fronteira" width="400" height="400" style="margin-top:20px;"></canvas>
+
+<div class="result" id="resultado"></div>
 
 </div>
 
 <script>
 
-// ativos
+// ================= SUPABASE =================
 
-const ativos=["BTC","AAPL","NVDA","SPY"]
+const supabaseClient = supabase.createClient(
+"https://dcfaxuoamqdsjwsugvpu.supabase.co",
+"sb_publishable_wFSv9W-PSccpep9ApyVtTA_5NzDbXvd"
+)
 
-const retornos=[0.15,0.12,0.18,0.10]
+// ================= Ativos =================
 
-const riscos=[0.40,0.30,0.35,0.20]
+const ativos = ["BTC","AAPL","NVDA","SPY"]
 
-// matriz simplificada de correlação
+const retornos = [0.15,0.12,0.18,0.10]
 
-const correlacao=[
-[1,0.3,0.4,0.2],
-[0.3,1,0.5,0.4],
-[0.4,0.5,1,0.3],
-[0.2,0.4,0.3,1]
-]
+const riscos = [0.40,0.30,0.35,0.20]
 
-let chartFronteira
+let fronteiraChart = null
+let melhorPort = null
 
-function calcularRisco(w){
-
-let risco=0
-
-for(let i=0;i<w.length;i++){
-
-for(let j=0;j<w.length;j++){
-
-risco+=w[i]*w[j]*riscos[i]*riscos[j]*correlacao[i][j]
-
-}
-
-}
-
-return Math.sqrt(risco)
-
-}
+// ================= OTIMIZAÇÃO =================
 
 function otimizarPortfolio(){
 
-const rf=0.02
+const rf = 0.02
+const passos = 50
 
-const passos=40
+let melhorSharpe = -Infinity
 
-let melhorSharpe=-Infinity
+const pontos = []
 
-let melhorPort=null
+for (let w1 = 0; w1 <= 1; w1 += 1/passos){
+for (let w2 = 0; w2 <= 1-w1; w2 += 1/passos){
+for (let w3 = 0; w3 <= 1-w1-w2; w3 += 1/passos){
 
-let pontos=[]
+let w4 = 1 - w1 - w2 - w3
 
-for(let w1=0;w1<=1;w1+=1/passos){
+if(w4 < 0) continue
 
-for(let w2=0;w2<=1-w1;w2+=1/passos){
+let r =
+w1*retornos[0] +
+w2*retornos[1] +
+w3*retornos[2] +
+w4*retornos[3]
 
-for(let w3=0;w3<=1-w1-w2;w3+=1/passos){
+let s = Math.sqrt(
+Math.pow(w1*riscos[0],2)+
+Math.pow(w2*riscos[1],2)+
+Math.pow(w3*riscos[2],2)+
+Math.pow(w4*riscos[3],2)
+)
 
-let w4=1-w1-w2-w3
+let sharpe = (r-rf)/s
 
-if(w4<0)continue
+pontos.push({x:s,y:r})
 
-const w=[w1,w2,w3,w4]
+if(sharpe > melhorSharpe){
 
-let retorno=0
+melhorSharpe = sharpe
 
-for(let i=0;i<w.length;i++){
-
-retorno+=w[i]*retornos[i]
-
-}
-
-let risco=calcularRisco(w)
-
-let sharpe=(retorno-rf)/risco
-
-pontos.push({
-
-x:risco*100,
-
-y:retorno*100
-
-})
-
-if(sharpe>melhorSharpe){
-
-melhorSharpe=sharpe
-
-melhorPort={w,retorno,risco,sharpe}
-
+melhorPort = {
+w:[w1,w2,w3,w4],
+retorno:r,
+risco:s
 }
 
 }
 
 }
-
+}
 }
 
-// gráfico
+// Mostrar resultado
 
-const ctx=document.getElementById("fronteira")
+document.getElementById("resultado").innerHTML =
+`
+Melhor Portfólio<br><br>
 
-if(chartFronteira)chartFronteira.destroy()
+BTC: ${(melhorPort.w[0]*100).toFixed(1)}%<br>
+AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%<br>
+NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%<br>
+SPY: ${(melhorPort.w[3]*100).toFixed(1)}%<br><br>
 
-chartFronteira=new Chart(ctx,{
+Retorno esperado: ${(melhorPort.retorno*100).toFixed(2)}%<br>
+Risco: ${(melhorPort.risco*100).toFixed(2)}%
+`
 
+// Gráfico
+
+if(fronteiraChart){
+fronteiraChart.destroy()
+}
+
+fronteiraChart = new Chart(
+document.getElementById("fronteira"),
+{
 type:"scatter",
-
 data:{
-
-datasets:[
-
-{
-
+datasets:[{
 label:"Fronteira eficiente",
+data:pontos
+}]
+}
+}
+)
 
-data:pontos,
+}
 
-backgroundColor:"#36A2EB",
+// ================= SALVAR PORTFÓLIO =================
 
-pointRadius:2
+async function salvarPortfolio(){
 
+if(!melhorPort){
+
+alert("Primeiro otimize o portfólio!")
+
+return
+
+}
+
+const portfolio = {
+
+name:"Portfolio AI",
+
+assets:{
+BTC:melhorPort.w[0],
+AAPL:melhorPort.w[1],
+NVDA:melhorPort.w[2],
+SPY:melhorPort.w[3]
 },
 
-{
+performance:melhorPort.retorno,
 
-label:"Melhor Sharpe",
-
-data:[{
-
-x:melhorPort.risco*100,
-
-y:melhorPort.retorno*100
-
-}],
-
-backgroundColor:"red",
-
-pointRadius:7
+risk_score:melhorPort.risco
 
 }
 
-]
+const {data,error} = await supabaseClient
+.from("portfolios")
+.insert([portfolio])
 
-},
+if(error){
 
-options:{
+alert("Erro ao salvar portfólio")
 
-plugins:{legend:{position:"bottom"}},
+console.log(error)
 
-scales:{
+}else{
 
-x:{title:{display:true,text:"Risco (%)"}},
+alert("Portfólio salvo com sucesso!")
 
-y:{title:{display:true,text:"Retorno (%)"}}
+console.log(data)
 
 }
-
-}
-
-})
-
-// resultado
-
-let html=`<b>Melhor portfólio</b><br>`
-
-ativos.forEach((ativo,i)=>{
-
-html+=`${ativo}: ${(melhorPort.w[i]*100).toFixed(1)}%<br>`
-
-})
-
-html+=`<br>Sharpe Ratio: ${melhorPort.sharpe.toFixed(2)}`
-
-document.getElementById("resultado").innerHTML=html
 
 }
 
 </script>
 
 </body>
-  </html>
+</html>
