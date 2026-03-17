@@ -1,176 +1,143 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Finlytics AI - Otimização</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<style>
-body{font-family:Arial;background:#0f172a;color:white;margin:0;padding:0;}
-.container{max-width:900px;margin:auto;padding:40px 20px;text-align:center;}
-button{padding:12px 20px;border:none;background:#2563eb;color:white;border-radius:6px;cursor:pointer;margin:10px;}
-button:hover{background:#1d4ed8;}
-input{width:60px;padding:5px;border-radius:5px;border:none;text-align:center;margin:0 5px;}
-.input-row{display:flex;justify-content:center;margin:15px 0;}
-.result{margin-top:20px;font-size:18px;}
-</style>
-</head>
-<body>
-
-<!-- Login -->
-<div class="container" id="loginBox">
-<h2>Login Finlytics AI</h2>
-<input type="email" id="email" placeholder="Email">
-<input type="password" id="password" placeholder="Senha">
-<button onclick="login()">Entrar / Registrar</button>
-<div class="result" id="loginFeedback"></div>
-</div>
-
-<!-- App -->
-<div class="container" id="appBox" style="display:none;">
-<h1>Finlytics AI</h1>
-<h2>Otimização de Portfólio</h2>
-
-<!-- Botões -->
-<div>
-<button onclick="calcular()">Calcular Retorno & Risco</button>
-<button onclick="simular()">Simulação Monte Carlo</button>
-<button onclick="otimizarPortfolio()">Otimizar portfólio (Sharpe)</button>
-<button onclick="salvarPortfolio()">Salvar Portfólio</button>
-</div>
-
-<!-- Inputs de pesos -->
-<div class="input-row" id="inputsPesos"></div>
-
-<!-- Resultados -->
-<div class="result" id="resultado"></div>
-
-<!-- Gráficos -->
-<canvas id="grafico" style="margin-top:30px;"></canvas>
-<canvas id="monteCarlo" style="margin-top:30px;"></canvas>
-<canvas id="fronteira" style="margin-top:30px;"></canvas>
-</div>
-
 <script>
-// ================= Supabase =================
-const SUPABASE_URL = "COLE_AQUI_SUA_URL";
-const SUPABASE_KEY = "COLE_AQUI_SUA_ANON_KEY";
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ================= SUPABASE CONFIG =================
+const SUPABASE_URL = "https://dcfaxuoamqdsjwsugvpu.supabase.co";
+const SUPABASE_KEY = "sb_publishable_wFSv9W-PSccpep9ApyVtTA_5NzDbXvd";
+
+const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 let user = null;
 
-// ================= Ativos =================
+// ================= AUTO LOGIN =================
+async function checkUser(){
+  const { data } = await client.auth.getUser();
+  if(data.user){
+    user = data.user;
+    abrirApp();
+  }
+}
+checkUser();
+
+// ================= LOGIN =================
+async function login(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const feedback = document.getElementById("loginFeedback");
+
+  if(!email || !password){
+    feedback.innerText = "Preencha tudo!";
+    return;
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({email, password});
+
+  if(error){
+    const { data: newUser, error: regError } = await client.auth.signUp({email, password});
+    if(regError){
+      feedback.innerText = regError.message;
+      return;
+    }
+    user = newUser.user;
+    feedback.innerText = "Conta criada!";
+  } else {
+    user = data.user;
+  }
+
+  abrirApp();
+}
+
+// ================= LOGOUT =================
+async function logout(){
+  await client.auth.signOut();
+  location.reload();
+}
+
+// ================= UI =================
+function abrirApp(){
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("appBox").style.display = "block";
+  initInputs();
+  criarGrafico();
+}
+
+// ================= ATIVOS =================
 const ativos = ["BTC","AAPL","NVDA","SPY"];
 let pesos = [0.30,0.25,0.20,0.25];
 const retornos = [0.15,0.12,0.18,0.10];
 const riscos = [0.40,0.30,0.35,0.20];
 
-let chart, monteChart, fronteiraChart;
+let chart;
 
-// ================= Login =================
-async function login(){
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-  const feedback = document.getElementById("loginFeedback");
-  feedback.innerText = "";
-  if(!email || !password){ feedback.innerText = "Preencha todos os campos!"; return; }
-
-  const { data: loginData, error } = await supabase.auth.signInWithPassword({email,password});
-  if(error){
-    const { data: newUser, error: regError } = await supabase.auth.signUp({email,password});
-    if(regError){ feedback.innerText = regError.message; return; }
-    user = newUser.user;
-    feedback.innerText = "Registrado com sucesso!";
-  } else { user = loginData.user; }
-
-  document.getElementById("loginBox").style.display="none";
-  document.getElementById("appBox").style.display="block";
-  initInputs();
-  criarGrafico();
-}
-
-// ================= Inputs de Pesos =================
+// ================= INPUTS =================
 function initInputs(){
   const container = document.getElementById("inputsPesos");
   container.innerHTML = "";
+
   ativos.forEach((ativo,i)=>{
     const input = document.createElement("input");
-    input.type="number"; input.min=0; input.max=100; input.value=pesos[i]*100;
+    input.type="number";
+    input.value=pesos[i]*100;
+
     input.onchange=()=>{
-      pesos[i]=Math.min(Math.max(input.value/100,0),1);
-      if(pesos.reduce((a,b)=>a+b,0)>1){ document.getElementById("resultado").innerText="Soma dos pesos não pode exceder 100%!"; } 
-      else { document.getElementById("resultado").innerText=""; }
+      pesos[i]=input.value/100;
       criarGrafico();
     };
+
     container.appendChild(input);
   });
 }
 
-// ================= Calcular =================
+// ================= CÁLCULO =================
 function calcular(){
   let retorno=0, risco=0;
-  for(let i=0;i<pesos.length;i++){ retorno+=pesos[i]*retornos[i]; risco+=pesos[i]*riscos[i]; }
-  document.getElementById("resultado").innerHTML=`Retorno esperado: ${(retorno*100).toFixed(2)}%<br>Risco estimado: ${(risco*100).toFixed(2)}%`;
-  criarGrafico();
-}
 
-// ================= Monte Carlo =================
-function simular(){
-  let simulacoes=1000, valorInicial=10000, resultados=[];
-  for(let i=0;i<simulacoes;i++){
-    let valor=valorInicial;
-    for(let ano=0;ano<10;ano++){ let r=(Math.random()*0.20)-0.05; valor*=1+r; }
-    resultados.push(valor);
+  for(let i=0;i<pesos.length;i++){
+    retorno+=pesos[i]*retornos[i];
+    risco+=pesos[i]*riscos[i];
   }
-  const media = resultados.reduce((a,b)=>a+b,0)/simulacoes;
-  document.getElementById("resultado").innerHTML+=`<br><br>Valor médio após 10 anos: $${media.toFixed(2)}`;
-  criarGraficoMonteCarlo(resultados);
+
+  document.getElementById("resultado").innerHTML =
+    `Retorno: ${(retorno*100).toFixed(2)}% | Risco: ${(risco*100).toFixed(2)}%`;
 }
 
-// ================= Gráficos =================
+// ================= GRÁFICO =================
 function criarGrafico(){
-  const ctx=document.getElementById("grafico");
+  const ctx = document.getElementById("grafico");
+
   if(chart) chart.destroy();
-  chart=new Chart(ctx,{type:"pie",data:{labels:ativos,datasets:[{data:pesos.map(p=>p*100),backgroundColor:["#f59e0b","#3b82f6","#10b981","#ef4444"]}]},options:{plugins:{legend:{position:"bottom"}}}});
-}
-function criarGraficoMonteCarlo(resultados){
-  const ctx=document.getElementById("monteCarlo");
-  if(monteChart) monteChart.destroy();
-  monteChart=new Chart(ctx,{type:"line",data:{labels:resultados.map((_,i)=>i+1),datasets:[{label:"Simulação",data:resultados,borderColor:"#36a2eb",fill:false}]},options:{plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:"Simulação"}},y:{title:{display:true,text:"Valor"}}}}});
-}
 
-// ================= Otimização (Sharpe) =================
-function otimizarPortfolio(){
-  const rf = 0.02; const passos=50; let melhorSharpe=-Infinity; let melhorPort={}; const pontos=[];
-  for(let w1=0;w1<=1;w1+=1/passos){
-    for(let w2=0;w2<=1-w1;w2+=1/passos){
-      for(let w3=0;w3<=1-w1-w2;w3+=1/passos){
-        let w4=1-w1-w2-w3; if(w4<0) continue;
-        let r=w1*retornos[0]+w2*retornos[1]+w3*retornos[2]+w4*retornos[3];
-        let s=Math.sqrt(Math.pow(w1*riscos[0],2)+Math.pow(w2*riscos[1],2)+Math.pow(w3*riscos[2],2)+Math.pow(w4*riscos[3],2));
-        let sharpe=(r-rf)/s;
-        pontos.push({x:s*100,y:r*100});
-        if(sharpe>melhorSharpe){ melhorSharpe=sharpe; melhorPort={x:s*100,y:r*100,w:[w1,w2,w3,w4],sharpe}; }
-      }
+  chart = new Chart(ctx, {
+    type:"pie",
+    data:{
+      labels:ativos,
+      datasets:[{
+        data:pesos.map(p=>p*100)
+      }]
     }
-  }
-  const ctx=document.getElementById('fronteira');
-  if(fronteiraChart) fronteiraChart.destroy();
-  fronteiraChart=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Fronteira eficiente',data:pontos,pointRadius:2,backgroundColor:'#36A2EB'},{label:'Melhor Sharpe',data:[{x:melhorPort.x,y:melhorPort.y}],pointRadius:6,backgroundColor:'#FF0000'}]},options:{plugins:{legend:{position:'bottom'}},scales:{x:{title:{display:true,text:'Risco (%)'}},y:{title:{display:true,text:'Retorno (%)'}}}}});
-  document.getElementById("resultado").innerHTML+=`<br><br><strong>Melhor portfólio (Sharpe: ${melhorSharpe.toFixed(2)}):</strong><br>BTC: ${(melhorPort.w[0]*100).toFixed(1)}%<br>AAPL: ${(melhorPort.w[1]*100).toFixed(1)}%<br>NVDA: ${(melhorPort.w[2]*100).toFixed(1)}%<br>SPY: ${(melhorPort.w[3]*100).toFixed(1)}%`;
+  });
 }
 
-// ================= Salvar Portfólio =================
+// ================= SALVAR =================
 async function salvarPortfolio(){
-  if(!user){ document.getElementById("resultado").innerText="Faça login antes!"; return; }
-  const name=prompt("Nome do portfólio:");
-  if(!name){ document.getElementById("resultado").innerText="Nome inválido."; return; }
-  const portfolioData={ativos,pesos,retornos,riscos};
-  const {data,error}=await supabase.from("portfolios").insert([{name,owner_id:user.id,assets:portfolioData}]);
-  if(error){ document.getElementById("resultado").innerText=error.message; } 
-  else{ document.getElementById("resultado").innerText="Portfólio salvo com sucesso!"; }
+  if(!user){
+    alert("Faça login");
+    return;
+  }
+
+  const name = prompt("Nome do portfólio:");
+  if(!name) return;
+
+  const { error } = await client
+    .from("portfolios")
+    .insert([{
+      name,
+      owner_id: user.id,
+      data: {ativos, pesos}
+    }]);
+
+  if(error){
+    alert(error.message);
+  } else {
+    alert("Salvo!");
+  }
 }
 </script>
-
-</body>
-</html>
