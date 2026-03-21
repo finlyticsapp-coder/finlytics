@@ -1,13 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finlytics AI</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+<style>
+body{font-family:Arial;background:#0f172a;color:white;text-align:center;}
+button{padding:10px 20px;margin:5px;background:#2563eb;color:white;border:none;border-radius:5px;}
+input{width:60px;text-align:center;}
+</style>
+</head>
+
+<body>
+
+<div id="loginBox">
+  <h2>Login</h2>
+  <input id="email" placeholder="Email"><br><br>
+  <input id="password" type="password" placeholder="Senha"><br><br>
+  <button onclick="login()">Entrar</button>
+  <div id="loginFeedback"></div>
+</div>
+
+<div id="appBox" style="display:none;">
+  <h1>Finlytics AI</h1>
+
+  <div id="inputsPesos"></div>
+
+  <br>
+  <button onclick="calcular()">Calcular</button>
+  <button onclick="otimizarPortfolioPro()">IA PRO</button>
+  <button onclick="salvarPortfolio()">Salvar</button>
+  <button onclick="logout()">Sair</button>
+
+  <div id="resultado"></div>
+
+  <canvas id="grafico"></canvas>
+</div>
+
 <script>
-// ================= SUPABASE CONFIG =================
+
 const SUPABASE_URL = "https://dcfaxuoamqdsjwsugvpu.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wFSv9W-PSccpep9ApyVtTA_5NzDbXvd";
 
-const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let user = null;
 
-// ================= AUTO LOGIN =================
 async function checkUser(){
   const { data } = await client.auth.getUser();
   if(data.user){
@@ -17,25 +59,15 @@ async function checkUser(){
 }
 checkUser();
 
-// ================= LOGIN =================
 async function login(){
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
   const feedback = document.getElementById("loginFeedback");
 
-  if(!email || !password){
-    feedback.innerText = "Preencha tudo!";
-    return;
-  }
-
-  const { data, error } = await client.auth.signInWithPassword({email, password});
+  const { data, error } = await client.auth.signInWithPassword({email,password});
 
   if(error){
-    const { data: newUser, error: regError } = await client.auth.signUp({email, password});
-    if(regError){
-      feedback.innerText = regError.message;
-      return;
-    }
+    const { data: newUser } = await client.auth.signUp({email,password});
     user = newUser.user;
     feedback.innerText = "Conta criada!";
   } else {
@@ -45,149 +77,111 @@ async function login(){
   abrirApp();
 }
 
-// ================= LOGOUT =================
 async function logout(){
   await client.auth.signOut();
   location.reload();
 }
 
-// ================= UI =================
 function abrirApp(){
-  document.getElementById("loginBox").style.display = "none";
-  document.getElementById("appBox").style.display = "block";
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("appBox").style.display="block";
   initInputs();
   criarGrafico();
 }
 
-// ================= ATIVOS =================
 const ativos = ["BTC","AAPL","NVDA","SPY"];
-let pesos = [0.30,0.25,0.20,0.25];
+let pesos = [0.3,0.25,0.2,0.25];
 const retornos = [0.15,0.12,0.18,0.10];
 const riscos = [0.40,0.30,0.35,0.20];
 
 let chart;
 
-// ================= INPUTS =================
 function initInputs(){
-  const container = document.getElementById("inputsPesos");
-  container.innerHTML = "";
-
-  ativos.forEach((ativo,i)=>{
-    const input = document.createElement("input");
-    input.type="number";
-    input.min = 0;
-    input.max = 100;
+  const c = document.getElementById("inputsPesos");
+  c.innerHTML="";
+  ativos.forEach((a,i)=>{
+    const input=document.createElement("input");
     input.value=pesos[i]*100;
-
     input.onchange=()=>{
-      pesos[i]=Math.min(Math.max(input.value/100,0),1);
+      pesos[i]=input.value/100;
       criarGrafico();
     };
-
-    container.appendChild(input);
+    c.appendChild(input);
   });
 }
 
-// ================= CÁLCULO =================
 function calcular(){
-  let retorno=0, risco=0;
-
+  let r=0,s=0;
   for(let i=0;i<pesos.length;i++){
-    retorno+=pesos[i]*retornos[i];
-    risco+=pesos[i]*riscos[i];
+    r+=pesos[i]*retornos[i];
+    s+=pesos[i]*riscos[i];
   }
 
   document.getElementById("resultado").innerHTML =
-    `Retorno: ${(retorno*100).toFixed(2)}% | Risco: ${(risco*100).toFixed(2)}%`;
+  `Retorno: ${(r*100).toFixed(2)}% | Risco: ${(s*100).toFixed(2)}%`;
 }
 
-// ================= OTIMIZAÇÃO PRO =================
 function otimizarPortfolioPro(){
 
-  const rf = 0.02;
-  const maxRisco = 0.35;
-  const maxPeso = 0.5;
-
-  let melhor = null;
-  let melhorScore = -Infinity;
+  let melhor=null;
+  let melhorScore=-Infinity;
 
   for(let i=0;i<2000;i++){
-
-    let w = [];
-    let soma = 0;
+    let w=[], soma=0;
 
     for(let j=0;j<ativos.length;j++){
-      let val = Math.random();
-      w.push(val);
-      soma += val;
+      let v=Math.random();
+      w.push(v); soma+=v;
     }
 
-    w = w.map(v => v / soma);
+    w=w.map(v=>v/soma);
 
-    // Limite por ativo
-    if(w.some(v => v > maxPeso)) continue;
-
-    let retorno = 0;
-    let risco = 0;
-
+    let r=0,s=0;
     for(let k=0;k<w.length;k++){
-      retorno += w[k] * retornos[k];
-      risco += w[k] * riscos[k];
+      r+=w[k]*retornos[k];
+      s+=w[k]*riscos[k];
     }
 
-    // Limite de risco
-    if(risco > maxRisco) continue;
+    let sharpe=(r-0.02)/s;
 
-    let sharpe = (retorno - rf) / risco;
-
-    // Penalização por concentração
-    let diversificacao = w.reduce((acc,v)=> acc + Math.pow(v,2),0);
-    let penalidade = diversificacao * 0.2;
-
-    let score = sharpe - penalidade;
-
-    if(score > melhorScore){
-      melhorScore = score;
-      melhor = {w, retorno, risco, sharpe};
+    if(sharpe>melhorScore){
+      melhorScore=sharpe;
+      melhor={w,r,s};
     }
   }
 
-  if(melhor){
-    pesos = melhor.w;
+  pesos=melhor.w;
 
-    document.getElementById("resultado").innerHTML = `
-    <br><strong>Alocação Ótima Automatizada:</strong><br>
-    Retorno: ${(melhor.retorno*100).toFixed(2)}%<br>
-    Risco: ${(melhor.risco*100).toFixed(2)}%<br>
-    Sharpe: ${melhor.sharpe.toFixed(2)}
-    `;
+  document.getElementById("resultado").innerHTML =
+  `IA PRO → Retorno: ${(melhor.r*100).toFixed(2)}%`;
 
-    criarGrafico();
-  }
+  criarGrafico();
 }
 
-// ================= SALVAR =================
+function criarGrafico(){
+  const ctx=document.getElementById("grafico");
+  if(chart) chart.destroy();
+
+  chart=new Chart(ctx,{
+    type:"pie",
+    data:{
+      labels:ativos,
+      datasets:[{data:pesos.map(p=>p*100)}]
+    }
+  });
+}
+
 async function salvarPortfolio(){
-  if(!user){
-    alert("Faça login");
-    return;
-  }
+  await client.from("portfolios").insert([{
+    name:"portfolio",
+    owner_id:user.id,
+    assets:{pesos}
+  }]);
 
-  const name = prompt("Nome do portfólio:");
-  if(!name) return;
-
-  const { error } = await client
-    .from("portfolios")
-    .insert([{
-      name,
-      owner_id: user.id,
-      data: {ativos, pesos}
-    }]);
-
-  if(error){
-    alert(error.message);
-  } else {
-    alert("Portfólio salvo!");
-  }
+  alert("Salvo!");
 }
-  </script>
+
+</script>
+
+</body>
+  </html>
