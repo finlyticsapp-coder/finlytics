@@ -75,10 +75,12 @@ function initInputs(){
   ativos.forEach((ativo,i)=>{
     const input = document.createElement("input");
     input.type="number";
+    input.min = 0;
+    input.max = 100;
     input.value=pesos[i]*100;
 
     input.onchange=()=>{
-      pesos[i]=input.value/100;
+      pesos[i]=Math.min(Math.max(input.value/100,0),1);
       criarGrafico();
     };
 
@@ -99,21 +101,69 @@ function calcular(){
     `Retorno: ${(retorno*100).toFixed(2)}% | Risco: ${(risco*100).toFixed(2)}%`;
 }
 
-// ================= GRÁFICO =================
-function criarGrafico(){
-  const ctx = document.getElementById("grafico");
+// ================= OTIMIZAÇÃO PRO =================
+function otimizarPortfolioPro(){
 
-  if(chart) chart.destroy();
+  const rf = 0.02;
+  const maxRisco = 0.35;
+  const maxPeso = 0.5;
 
-  chart = new Chart(ctx, {
-    type:"pie",
-    data:{
-      labels:ativos,
-      datasets:[{
-        data:pesos.map(p=>p*100)
-      }]
+  let melhor = null;
+  let melhorScore = -Infinity;
+
+  for(let i=0;i<2000;i++){
+
+    let w = [];
+    let soma = 0;
+
+    for(let j=0;j<ativos.length;j++){
+      let val = Math.random();
+      w.push(val);
+      soma += val;
     }
-  });
+
+    w = w.map(v => v / soma);
+
+    // Limite por ativo
+    if(w.some(v => v > maxPeso)) continue;
+
+    let retorno = 0;
+    let risco = 0;
+
+    for(let k=0;k<w.length;k++){
+      retorno += w[k] * retornos[k];
+      risco += w[k] * riscos[k];
+    }
+
+    // Limite de risco
+    if(risco > maxRisco) continue;
+
+    let sharpe = (retorno - rf) / risco;
+
+    // Penalização por concentração
+    let diversificacao = w.reduce((acc,v)=> acc + Math.pow(v,2),0);
+    let penalidade = diversificacao * 0.2;
+
+    let score = sharpe - penalidade;
+
+    if(score > melhorScore){
+      melhorScore = score;
+      melhor = {w, retorno, risco, sharpe};
+    }
+  }
+
+  if(melhor){
+    pesos = melhor.w;
+
+    document.getElementById("resultado").innerHTML = `
+    <br><strong>Alocação Ótima Automatizada:</strong><br>
+    Retorno: ${(melhor.retorno*100).toFixed(2)}%<br>
+    Risco: ${(melhor.risco*100).toFixed(2)}%<br>
+    Sharpe: ${melhor.sharpe.toFixed(2)}
+    `;
+
+    criarGrafico();
+  }
 }
 
 // ================= SALVAR =================
@@ -137,7 +187,7 @@ async function salvarPortfolio(){
   if(error){
     alert(error.message);
   } else {
-    alert("Salvo!");
+    alert("Portfólio salvo!");
   }
 }
-</script>
+  </script>
