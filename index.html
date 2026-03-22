@@ -1,468 +1,200 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>Finlytics AI</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
 <style>
-
-body{
-font-family:Arial;
-background:#0f172a;
-color:white;
-margin:0;
-padding:0;
-}
-
-.container{
-max-width:900px;
-margin:auto;
-padding:40px 20px;
-}
-
-h1,h2{
-text-align:center;
-}
-
-.buttons{
-display:flex;
-gap:10px;
-justify-content:center;
-flex-wrap:wrap;
-margin:20px 0;
-}
-
-button{
-padding:12px 20px;
-border:none;
-background:#2563eb;
-color:white;
-border-radius:6px;
-cursor:pointer;
-}
-
-button:hover{
-background:#1d4ed8;
-}
-
-.result{
-margin-top:20px;
-text-align:center;
-font-size:18px;
-}
-
-.chart{
-margin-top:40px;
-}
-
-.input-row{
-display:flex;
-justify-content:center;
-gap:10px;
-margin:10px 0;
-}
-
-.input-row input{
-width:60px;
-padding:5px;
-border-radius:5px;
-border:none;
-text-align:center;
-}
-
-.feedback{
-text-align:center;
-margin-top:15px;
-color:#10b981;
-font-weight:bold;
-}
-
-.login{
-max-width:400px;
-margin:auto;
-background:#1e293b;
-padding:20px;
-border-radius:10px;
-margin-top:50px;
-}
-
-.login input{
-width:100%;
-padding:10px;
-margin:10px 0;
-border-radius:5px;
-border:none;
-}
-
+body{font-family:Arial;background:#0f172a;color:white;text-align:center;}
+button{padding:10px 20px;margin:5px;background:#2563eb;color:white;border:none;border-radius:5px;}
+input{width:60px;text-align:center;}
 </style>
-
 </head>
 
 <body>
 
-<div class="login" id="loginBox">
-
-<h2>Login Finlytics AI</h2>
-
-<input type="email" id="email" placeholder="Email">
-<input type="password" id="password" placeholder="Senha">
-
-<button onclick="login()">Entrar / Registrar</button>
-
-<div id="loginFeedback" class="feedback"></div>
-
+<!-- LOGIN -->
+<div id="loginBox">
+  <h2>Login</h2>
+  <input id="email" placeholder="Email"><br><br>
+  <input id="password" type="password" placeholder="Senha"><br><br>
+  <button onclick="login()">Entrar</button>
+  <div id="loginFeedback"></div>
 </div>
 
+<!-- APP -->
+<div id="appBox" style="display:none;">
+  <h1>Finlytics AI</h1>
 
-<div class="container" id="appBox" style="display:none;">
+  <div id="inputsPesos"></div>
 
-<h1>Finlytics AI</h1>
-<h2>Análise Inteligente de Portfólio</h2>
+  <br>
+  <button onclick="calcular()">Calcular</button>
+  <button onclick="otimizarPortfolioPro()">IA PRO</button>
+  <button onclick="salvarPortfolio()">Salvar</button>
+  <button onclick="logout()">Sair</button>
 
-<div class="buttons">
+  <div id="resultado"></div>
 
-<button onclick="calcular()">Calcular Retorno</button>
-
-<button onclick="simular()">Monte Carlo</button>
-
-<button onclick="salvarPortfolio()">Salvar</button>
-
+  <canvas id="grafico"></canvas>
 </div>
-
-<div id="inputsPesos" class="input-row"></div>
-
-<div id="resultado" class="result"></div>
-
-<div class="chart">
-
-<canvas id="grafico"></canvas>
-
-<canvas id="monteCarlo"></canvas>
-
-</div>
-
-<div id="feedback" class="feedback"></div>
-
-</div>
-
 
 <script>
 
-// SUPABASE
+// ================= SUPABASE =================
+const SUPABASE_URL = "https://dcfaxuoamqdsjwsugvpu.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRjZmF4dW9hbXFkc2p3c3VndnB1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMjUzMjYsImV4cCI6MjA4NzkwMTMyNn0.IWYyvbWQKDEIcUnVmaY80E6PfwAzsa1jzH7ZgjCZ53I";
 
-const SUPABASE_URL="https://dcfaxuoamqdsjwsugvpu.supabase.co"
+const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+let user = null;
 
-const supabaseClient=supabase.createClient(SUPABASE_URL,SUPABASE_KEY)
+// ================= AUTO LOGIN =================
+async function checkUser(){
+  const { data } = await client.auth.getUser();
+  if(data.user){
+    user = data.user;
+    abrirApp();
+  }
+}
+checkUser();
 
-let user=null
-
-
-// ATIVOS
-
-const ativos=["BTC","AAPL","NVDA","SPY"]
-
-let pesos=[0.30,0.25,0.20,0.25]
-
-const retornos=[0.15,0.12,0.18,0.10]
-
-const riscos=[0.40,0.30,0.35,0.20]
-
-let chart
-let monteChart
-
-
-
-// LOGIN
-
+// ================= LOGIN =================
 async function login(){
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const feedback = document.getElementById("loginFeedback");
 
-const email=document.getElementById("email").value
+  const { data, error } = await client.auth.signInWithPassword({email,password});
 
-const password=document.getElementById("password").value
+  if(error){
+    const { data: newUser } = await client.auth.signUp({email,password});
+    user = newUser.user;
+    feedback.innerText = "Conta criada!";
+  } else {
+    user = data.user;
+  }
 
-const feedback=document.getElementById("loginFeedback")
-
-feedback.innerText=""
-
-if(!email||!password){
-
-feedback.innerText="Preencha os campos"
-
-return
-
+  abrirApp();
 }
 
-const {data,error}=await supabaseClient.auth.signInWithPassword({
-
-email,
-password
-
-})
-
-if(error){
-
-const {data:newUser,error:regError}=await supabaseClient.auth.signUp({
-
-email,
-password
-
-})
-
-if(regError){
-
-feedback.innerText=regError.message
-
-return
-
+// ================= LOGOUT =================
+async function logout(){
+  await client.auth.signOut();
+  location.reload();
 }
 
-user=newUser.user
-
-feedback.innerText="Conta criada!"
-
+// ================= UI =================
+function abrirApp(){
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("appBox").style.display="block";
+  initInputs();
+  criarGrafico();
 }
 
-else{
+// ================= ATIVOS =================
+const ativos = ["BTC","AAPL","NVDA","SPY"];
+let pesos = [0.3,0.25,0.2,0.25];
+const retornos = [0.15,0.12,0.18,0.10];
+const riscos = [0.40,0.30,0.35,0.20];
 
-user=data.user
+let chart;
 
-}
-
-document.getElementById("loginBox").style.display="none"
-
-document.getElementById("appBox").style.display="block"
-
-initInputs()
-
-criarGrafico()
-
-}
-
-
-
-// INPUTS
-
+// ================= INPUTS =================
 function initInputs(){
-
-const container=document.getElementById("inputsPesos")
-
-container.innerHTML=""
-
-ativos.forEach((ativo,i)=>{
-
-const input=document.createElement("input")
-
-input.type="number"
-
-input.min=0
-
-input.max=100
-
-input.value=pesos[i]*100
-
-input.onchange=()=>{
-
-pesos[i]=input.value/100
-
-if(pesos.reduce((a,b)=>a+b,0)>1){
-
-document.getElementById("feedback").innerText="Peso total não pode passar de 100%"
-
+  const c = document.getElementById("inputsPesos");
+  c.innerHTML="";
+  ativos.forEach((a,i)=>{
+    const input=document.createElement("input");
+    input.value=pesos[i]*100;
+    input.onchange=()=>{
+      pesos[i]=input.value/100;
+      criarGrafico();
+    };
+    c.appendChild(input);
+  });
 }
 
-else{
-
-document.getElementById("feedback").innerText=""
-
-}
-
-criarGrafico()
-
-}
-
-container.appendChild(input)
-
-})
-
-}
-
-
-
-// CALCULAR
-
+// ================= CALCULAR =================
 function calcular(){
+  let r=0,s=0;
+  for(let i=0;i<pesos.length;i++){
+    r+=pesos[i]*retornos[i];
+    s+=pesos[i]*riscos[i];
+  }
 
-let retorno=0
-
-let risco=0
-
-for(let i=0;i<pesos.length;i++){
-
-retorno+=pesos[i]*retornos[i]
-
-risco+=pesos[i]*riscos[i]
-
+  document.getElementById("resultado").innerHTML =
+  `Retorno: ${(r*100).toFixed(2)}% | Risco: ${(s*100).toFixed(2)}%`;
 }
 
-document.getElementById("resultado").innerHTML=
+// ================= IA PRO =================
+function otimizarPortfolioPro(){
 
-`Retorno esperado: ${(retorno*100).toFixed(2)}%
+  let melhor=null;
+  let melhorScore=-Infinity;
 
-<br>
+  for(let i=0;i<2000;i++){
+    let w=[], soma=0;
 
-Risco estimado: ${(risco*100).toFixed(2)}%`
+    for(let j=0;j<ativos.length;j++){
+      let v=Math.random();
+      w.push(v); soma+=v;
+    }
 
+    w=w.map(v=>v/soma);
+
+    let r=0,s=0;
+    for(let k=0;k<w.length;k++){
+      r+=w[k]*retornos[k];
+      s+=w[k]*riscos[k];
+    }
+
+    let sharpe=(r-0.02)/s;
+
+    if(sharpe>melhorScore){
+      melhorScore=sharpe;
+      melhor={w,r,s};
+    }
+  }
+
+  pesos=melhor.w;
+
+  document.getElementById("resultado").innerHTML =
+  `IA PRO → Retorno: ${(melhor.r*100).toFixed(2)}%`;
+
+  criarGrafico();
 }
 
-
-
-// MONTE CARLO
-
-function simular(){
-
-let simulacoes=1000
-
-let valorInicial=10000
-
-let resultados=[]
-
-for(let i=0;i<simulacoes;i++){
-
-let valor=valorInicial
-
-for(let ano=0;ano<10;ano++){
-
-let r=(Math.random()*0.20)-0.05
-
-valor*=1+r
-
-}
-
-resultados.push(valor)
-
-}
-
-criarGraficoMonteCarlo(resultados)
-
-}
-
-
-
-// GRÁFICOS
-
+// ================= GRÁFICO =================
 function criarGrafico(){
+  const ctx=document.getElementById("grafico");
+  if(chart) chart.destroy();
 
-const ctx=document.getElementById("grafico")
-
-if(chart)chart.destroy()
-
-chart=new Chart(ctx,{
-
-type:"pie",
-
-data:{
-
-labels:ativos,
-
-datasets:[{
-
-data:pesos.map(p=>p*100),
-
-backgroundColor:["#f59e0b","#3b82f6","#10b981","#ef4444"]
-
-}]
-
+  chart=new Chart(ctx,{
+    type:"pie",
+    data:{
+      labels:ativos,
+      datasets:[{data:pesos.map(p=>p*100)}]
+    }
+  });
 }
 
-})
-
-}
-
-
-
-function criarGraficoMonteCarlo(resultados){
-
-const ctx=document.getElementById("monteCarlo")
-
-if(monteChart)monteChart.destroy()
-
-monteChart=new Chart(ctx,{
-
-type:"line",
-
-data:{
-
-labels:resultados.map((_,i)=>i+1),
-
-datasets:[{
-
-data:resultados,
-
-borderColor:"#36a2eb"
-
-}]
-
-}
-
-})
-
-}
-
-
-
-// SALVAR
-
+// ================= SALVAR =================
 async function salvarPortfolio(){
+  await client.from("portfolios").insert([{
+    name:"portfolio",
+    owner_id:user.id,
+    assets:{pesos}
+  }]);
 
-if(!user){
-
-document.getElementById("feedback").innerText="Faça login"
-
-return
-
-}
-
-const name=prompt("Nome do portfólio")
-
-if(!name)return
-
-const {error}=await supabaseClient
-
-.from("portfolios")
-
-.insert([{
-
-name,
-
-owner_id:user.id,
-
-assets:{ativos,pesos,retornos,riscos}
-
-}])
-
-if(error){
-
-document.getElementById("feedback").innerText=error.message
-
-}
-
-else{
-
-document.getElementById("feedback").innerText="Portfólio salvo!"
-
-}
-
+  alert("Salvo!");
 }
 
 </script>
 
 </body>
-</html>
+  </html>
